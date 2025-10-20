@@ -16,7 +16,7 @@ st.set_page_config(page_title="Account Dashboard", layout="wide")
 # Load data
 @st.cache_data
 def load_data():
-    df = pd.read_csv(r"/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_accounts_enriched.csv")  # Update path if different
+    df = pd.read_csv(r"bright_horizons_accounts_enriched.csv")  # Update path if different
     df['Opening Date'] = pd.to_datetime(df['Opening Date'], errors='coerce')
     df['Year Opened'] = df['Opening Date'].dt.year
     return df
