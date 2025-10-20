@@ -6,6 +6,13 @@ import seaborn as sns
 # Set page config
 st.set_page_config(page_title="Account Analytics Dashboard", layout="wide")
 
+st.write("This is the Account Dashboard.")
+ 
+st.set_page_config(page_title="Account Dashboard", layout="wide")
+
+#st.title("📊 Churn Prediction Results (from Test Data)")
+ 
+
 # Load data
 @st.cache_data
 def load_data():
