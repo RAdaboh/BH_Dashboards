@@ -11,7 +11,9 @@ from streamlit_folium import folium_static
 # Load Data
 @st.cache_data
 def load_data():
-    return pd.read_csv("C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\Featured data\\bright_horizons_agents_enriched.csv")  # Replace with actual file name
+    url = "https://drive.google.com/uc?id=1eglgGFPeuH6drP-RKLVX96xkK8BUtt4b"  # or Dropbox link
+    df = pd.read_csv(url)
+    return df
 
 df = load_data()
 st.title("Agent Performance & Coverage Dashboard")
