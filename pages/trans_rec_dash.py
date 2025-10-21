@@ -752,8 +752,8 @@ def main():
     
     # Load data
     try:
-        transactions_df = pd.read_csv(r'/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_transaction_recs_enriched.csv')
-        customer_df = pd.read_csv(r'/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_customers_enriched.csv')
+        transactions_df = pd.read_csv("https://drive.google.com/uc?id=1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc")
+        customer_df = pd.read_csv("https://drive.google.com/uc?id=1yudFOERd3cvnw1xMh5utMXW6kBn04l3c")
         
         # Data preprocessing
         transactions_df['Transaction_Date'] = pd.to_datetime(transactions_df['Transaction_Date'])
