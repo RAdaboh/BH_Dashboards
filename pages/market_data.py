@@ -13,10 +13,10 @@ st.title("Ghanaian Market Data Dashboard")
 # Load data function
 @st.cache_data
 def load_data():
-    industry_data = pd.read_excel('C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\External data\\Industry data.xlsx')
-    industry_pop = pd.read_excel('C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\External data\\Industry pop.xlsx')
-    region_pop = pd.read_excel('C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\External data\\Region pop.xlsx')
-    regbyindustry = pd.read_excel('C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\External data\\RegionbyIndustry.xlsx')
+    industry_data = pd.read_excel('https://docs.google.com/spreadsheets/d/1Swv5f8TpawfsSln29Vai5TRcA98eOE5B/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
+    industry_pop = pd.read_excel('https://docs.google.com/spreadsheets/d/1KV3WexpuHm_h5uEsj4yY8P5OwaVH8owr/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
+    region_pop = pd.read_excel('https://docs.google.com/spreadsheets/d/1D-PokWv6szmbmjnHW_qpS-y3JKmEzV-d/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
+    regbyindustry = pd.read_excel('https://docs.google.com/spreadsheets/d/1q-TEGK_Gk4lW6B7Sg_TGV00oqfbfkL1Y/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
     return industry_data, industry_pop, region_pop, regbyindustry
 
 # Load data
