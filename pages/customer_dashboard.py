@@ -27,7 +27,7 @@ avg_annual_growth = total_customers / years_active
     
 
 
-customers = load_customer_data()
+customers = load_data()
 customers['TenureYears'] = customers['Tenure'] / 12
 customers['YearJoined'] = pd.to_datetime(customers['Customer Since']).dt.year
 
