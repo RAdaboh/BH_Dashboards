@@ -194,7 +194,8 @@ with tab2:
     # Load real employee data
     @st.cache_data
     def load_employee_data():
-        df = pd.read_csv("C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\Featured data\\bright_horizons_employees_enriched.csv", parse_dates=["JoiningDate"])
+        url= "https://drive.google.com/uc?id=1mBakGt2_Rp7C_frcxsMxhhE0HYFlITld"
+        df = pd.read_csv(url)
         df['JoiningYear'] = pd.to_datetime(df['JoiningDate']).dt.year
         df['Tenure'] = (pd.to_datetime("today") - pd.to_datetime(df['JoiningDate'])).dt.days / 365
 
