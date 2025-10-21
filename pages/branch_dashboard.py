@@ -10,7 +10,9 @@ from streamlit_folium import folium_static
 # Load Data
 @st.cache_data
 def load_data():
-    return pd.read_csv("/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_branch_locations_enriched.csv")
+    url = "https://drive.google.com/uc?id=1azAAqoepNKIj7gqOkj6mpEkq9-1rRpCd"  # or Dropbox link
+    df = pd.read_csv(url)
+    return df
 
 df = load_data()
 st.title("📍 Branch Operations Dashboard")
