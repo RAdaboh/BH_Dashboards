@@ -17,6 +17,7 @@ def load_data():
 
 customers = load_data()
 
+customers['Customer Since'] = pd.to_datetime(customers['Customer Since'], errors='coerce')
 
 total_customers = customers['Customer ID'].nunique()
 start_year = customers['Customer Since'].min().year
