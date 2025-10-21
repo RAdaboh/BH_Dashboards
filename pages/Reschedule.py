@@ -54,9 +54,13 @@ st.markdown("""
 
 # Replace spaces with underscores in the column names
 # ...existing code...
+# Replace spaces with underscores in the column names
+# ...existing code...
 
 def normalize_and_map_columns(df):
     import re
+    import numpy as np
+
     def norm(s):
         s = str(s)
         s = re.sub(r'[^0-9A-Za-z]+', '_', s)
@@ -64,43 +68,70 @@ def normalize_and_map_columns(df):
         return s.strip('_').lower()
 
     df = df.copy()
-    df.columns = [norm(c) for c in df.columns]
+    orig_cols = list(df.columns)
+    norm_cols = [norm(c) for c in orig_cols]
+    df.columns = norm_cols
 
+    # candidate tokens -> canonical name (canonical names used by rest of the script)
     candidates = {
-        "Current_Status": ['current_status','status','payment_status','currentstatus'],
-        "Total_Amount_Due": ['total_amount_due','amount_due','total_due','amount_due_gross','amount'],
-        "Days_Overdue": ['days_overdue','overdue_days','days_late'],
-        "Installment_Number": ['installment_number','installment','inst_no'],
+        "Current_Status": ['current_status','status','payment_status','currentstatus','paymentstatus'],
+        "Total_Amount_Due": ['total_amount_due','amount_due','total_due','amount_due_gross','amount_due','amount'],
+        "Days_Overdue": ['days_overdue','overdue_days','days_late','days_overdue'],
+        "Installment_Number": ['installment_number','installment','inst_no','installment_no'],
         "Loan_Number": ['loan_number','loan_no','loan_id'],
-        "Region": ['region','location'],
+        "Region": ['region','location','area'],
         "Branch": ['branch'],
-        "Product_Type": ['product_type','product','product_code'],
+        "Product_Type": ['product_type','product','product_code','productcode'],
         "Collection_Probability": ['collection_probability','collection_prob','probability'],
-        "Installment_Amount": ['installment_amount','installment_value','installment_amt'],
-        "Due_Date": ['due_date','date','payment_date'],
-        "Customer_ID": ['customer_id','customerid','client_id'],
-        "Original_Loan_Amount": ['original_loan_amount','loan_amount','original_amount'],
+        "Installment_Amount": ['installment_amount','installment_value','installment_amt','installmentamount'],
+        "Due_Date": ['due_date','date','payment_date','due_date'],
+        "Customer_ID": ['customer_id','customerid','client_id','customerid'],
+        "Original_Loan_Amount": ['original_loan_amount','loan_amount','original_amount','loanamount'],
         "Principal_Component": ['principal_component','principal'],
         "Interest_Component": ['interest_component','interest'],
         "Penalty_Amount": ['penalty_amount','penalty']
     }
 
-    rename_map = {}
     cols = list(df.columns)
-    for canon, tokens in candidates.items():
+    rename_map = {}
+
+    # helper to find best match for a list of tokens
+    def find_best_col(tokens):
+        # exact matches
+        for t in tokens:
+            if t in cols:
+                return t
+        # contains all tokens (unlikely), then any token
         for c in cols:
-            if any(tok in c for tok in tokens):
-                rename_map[c] = canon
-                break
+            for t in tokens:
+                if t in c:
+                    return c
+        # no match
+        return None
+
+    for canon, tokens in candidates.items():
+        found = find_best_col(tokens)
+        if found:
+            rename_map[found] = canon
 
     if rename_map:
         df = df.rename(columns=rename_map)
 
-    # Coerce types for common columns
+    # Ensure canonical columns exist (create from best match or NaN) to avoid KeyErrors
+    for canon, tokens in candidates.items():
+        if canon not in df.columns:
+            found = find_best_col(tokens)
+            if found:
+                df[canon] = df[found]
+            else:
+                # create column with NaNs so downstream code won't KeyError
+                df[canon] = np.nan
+
+    # Coerce common types
     if 'Due_Date' in df.columns:
         df['Due_Date'] = pd.to_datetime(df['Due_Date'], errors='coerce')
     for col in ["Total_Amount_Due","Original_Loan_Amount","Principal_Component",
-                "Interest_Component","Penalty_Amount","Installment_Amount","Collection_Probability"]:
+                "Interest_Component","Penalty_Amount","Installment_Amount","Collection_Probability","Days_Overdue"]:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce')
 
@@ -108,7 +139,6 @@ def normalize_and_map_columns(df):
 
 # apply normalization + canonical mapping
 repay = normalize_and_map_columns(repay)
-
 # ...existing code...
 
 
