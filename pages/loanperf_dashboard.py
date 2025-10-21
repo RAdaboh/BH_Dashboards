@@ -62,25 +62,22 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        # Google Drive file IDs -> direct download URLs
-        url1_id = "1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo"
-        url2_id = "1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6"
-        url1 = f"https://drive.google.com/uc?export=download&id={url1_id}"
-        url2 = f"https://drive.google.com/uc?export=download&id={url2_id}"
 
-        loan_disbursement_df = pd.read_csv(url1)
-        loan_repayment_df = pd.read_csv(url2)
+        loan_disbursement_df = pd.read_csv("https://drive.google.com/uc?id=1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo")
+        loan_repayment_df = pd.read_csv("https://drive.google.com/uc?id=1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6")
 
-        # Normalize column names
-        loan_disbursement_df.columns = loan_disbursement_df.columns.str.strip().str.replace(' ', '_', regex=False)
-        loan_repayment_df.columns = loan_repayment_df.columns.str.strip().str.replace(' ', '_', regex=False)
 
+        # Clean column names (replace spaces with underscores)
+        loan_disbursement_df.columns = loan_disbursement_df.columns.str.replace(' ', '_')
+        loan_repayment_df.columns = loan_repayment_df.columns.str.replace(' ', '_')
+        
         return loan_disbursement_df, loan_repayment_df
-    except Exception as e:
-        st.error(f"Error loading data: {e}")
+    except FileNotFoundError:
+        st.error("Data files not found. Please ensure the data files are in the correct location.")
         return None, None
 
 loan_disbursement_df, loan_repayment_df = load_data()
+
 if loan_disbursement_df is None or loan_repayment_df is None:
     st.stop()
 
