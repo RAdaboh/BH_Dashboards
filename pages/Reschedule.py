@@ -5,6 +5,7 @@ import seaborn as sns
 import numpy as np
 from prophet import Prophet
 import matplotlib.dates as mdates
+import re
 
 # ------------------------------
 # Streamlit Page Config
@@ -52,7 +53,63 @@ st.markdown("""
 
 
 # Replace spaces with underscores in the column names
-repay.columns = repay.columns.str.replace(' ', '_')
+# ...existing code...
+
+def normalize_and_map_columns(df):
+    import re
+    def norm(s):
+        s = str(s)
+        s = re.sub(r'[^0-9A-Za-z]+', '_', s)
+        s = re.sub(r'_{2,}', '_', s)
+        return s.strip('_').lower()
+
+    df = df.copy()
+    df.columns = [norm(c) for c in df.columns]
+
+    candidates = {
+        "Current_Status": ['current_status','status','payment_status','currentstatus'],
+        "Total_Amount_Due": ['total_amount_due','amount_due','total_due','amount_due_gross','amount'],
+        "Days_Overdue": ['days_overdue','overdue_days','days_late'],
+        "Installment_Number": ['installment_number','installment','inst_no'],
+        "Loan_Number": ['loan_number','loan_no','loan_id'],
+        "Region": ['region','location'],
+        "Branch": ['branch'],
+        "Product_Type": ['product_type','product','product_code'],
+        "Collection_Probability": ['collection_probability','collection_prob','probability'],
+        "Installment_Amount": ['installment_amount','installment_value','installment_amt'],
+        "Due_Date": ['due_date','date','payment_date'],
+        "Customer_ID": ['customer_id','customerid','client_id'],
+        "Original_Loan_Amount": ['original_loan_amount','loan_amount','original_amount'],
+        "Principal_Component": ['principal_component','principal'],
+        "Interest_Component": ['interest_component','interest'],
+        "Penalty_Amount": ['penalty_amount','penalty']
+    }
+
+    rename_map = {}
+    cols = list(df.columns)
+    for canon, tokens in candidates.items():
+        for c in cols:
+            if any(tok in c for tok in tokens):
+                rename_map[c] = canon
+                break
+
+    if rename_map:
+        df = df.rename(columns=rename_map)
+
+    # Coerce types for common columns
+    if 'Due_Date' in df.columns:
+        df['Due_Date'] = pd.to_datetime(df['Due_Date'], errors='coerce')
+    for col in ["Total_Amount_Due","Original_Loan_Amount","Principal_Component",
+                "Interest_Component","Penalty_Amount","Installment_Amount","Collection_Probability"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    return df
+
+# apply normalization + canonical mapping
+repay = normalize_and_map_columns(repay)
+
+# ...existing code...
 
 
 # ------------------------------
