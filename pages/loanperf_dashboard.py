@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from PIL import Image
-import re
 
 # Set page config
 st.set_page_config(
@@ -63,74 +62,15 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        loan_disbursement_df = pd.read_csv("https://drive.google.com/uc?id=1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo")
-        loan_repayment_df = pd.read_csv("https://drive.google.com/uc?id=1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6")
 
-        # normalize column names to simple lowercase underscore form
-        def norm_cols(cols):
-            out = []
-            for c in cols:
-                s = str(c).strip()
-                s = re.sub(r'[^0-9A-Za-z]+', '_', s)   # non-alnum -> _
-                s = re.sub(r'_{2,}', '_', s)           # collapse underscores
-                s = s.strip('_').lower()
-                out.append(s)
-            return out
+        loan_disbursement_df = pd.read_csv('https://drive.google.com/uc?id=1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo')
+        loan_repayment_df = pd.read_csv('https://drive.google.com/uc?id=1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6')
 
-        loan_disbursement_df = loan_disbursement_df.copy()
-        loan_repayment_df = loan_repayment_df.copy()
-        loan_disbursement_df.columns = norm_cols(loan_disbursement_df.columns)
-        loan_repayment_df.columns = norm_cols(loan_repayment_df.columns)
 
-        # helper to find a column by keyword groups
-        def find_col(cols, keyword_groups):
-            cols_l = list(cols)
-            for group in keyword_groups:
-                for c in cols_l:
-                    if all(k in c for k in group):
-                        return c
-            # fallback: any column containing any keyword from any group
-            for group in keyword_groups:
-                for c in cols_l:
-                    if any(k in c for k in group):
-                        return c
-            return None
-
-        # canonical names used by the rest of the script
-        candidates = {
-            "Disbursement_Amount":    [['disbursement','amount'], ['disbursement'], ['disbursed','amount'], ['amount','disburse']],
-            "Amount_Paid":            [['amount','paid'], ['paid','amount'], ['repayment','amount'], ['payment','amount']],
-            "Repayment_Amount":       [['repayment','amount'], ['repayment'], ['paid','amount']],
-            "Total_Repayment":        [['total','repayment'], ['total_repayment'], ['expected','repayment']],
-            "Outstanding_Balance":    [['outstanding','balance'], ['outstanding'], ['balance']],
-            "Customer_ID":            [['customer','id'], ['customerid'], ['customer']],
-            "Loan_Number":            [['loan','number'], ['loan_no'], ['loan','id']],
-            "Region":                 [['region'], ['location']],
-            "Disbursement_Year":      [['disbursement','year'], ['year'], ['date']],
-            "Product_ID":             [['product'], ['product_id']],
-            "Branch":                 [['branch']]
-        }
-
-        def apply_canonical(df):
-            rename_map = {}
-            for canon, kw_groups in candidates.items():
-                found = find_col(df.columns, kw_groups)
-                if found:
-                    rename_map[found] = canon
-            if rename_map:
-                df = df.rename(columns=rename_map)
-            return df
-
-        loan_disbursement_df = apply_canonical(loan_disbursement_df)
-        loan_repayment_df = apply_canonical(loan_repayment_df)
-
-        # coerce likely numeric columns to numeric to avoid downstream issues
-        for col in ["Disbursement_Amount", "Amount_Paid", "Repayment_Amount", "Total_Repayment", "Outstanding_Balance"]:
-            if col in loan_disbursement_df.columns:
-                loan_disbursement_df[col] = pd.to_numeric(loan_disbursement_df[col], errors='coerce')
-            if col in loan_repayment_df.columns:
-                loan_repayment_df[col] = pd.to_numeric(loan_repayment_df[col], errors='coerce')
-
+        # Clean column names (replace spaces with underscores)
+        loan_disbursement_df.columns = loan_disbursement_df.columns.str.replace(' ', '_')
+        loan_repayment_df.columns = loan_repayment_df.columns.str.replace(' ', '_')
+        
         return loan_disbursement_df, loan_repayment_df
     except FileNotFoundError:
         st.error("Data files not found. Please ensure the data files are in the correct location.")
