@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import re
 
 # Set page config
 st.set_page_config(page_title="Market Data Dashboard", layout="wide")
@@ -13,15 +14,30 @@ st.title("Ghanaian Market Data Dashboard")
 # Load data function
 @st.cache_data
 def load_data():
-    industry_data = pd.read_excel('https://docs.google.com/spreadsheets/d/1Swv5f8TpawfsSln29Vai5TRcA98eOE5B/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
-    industry_pop = pd.read_excel('https://docs.google.com/spreadsheets/d/1KV3WexpuHm_h5uEsj4yY8P5OwaVH8owr/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
-    region_pop = pd.read_excel('https://docs.google.com/spreadsheets/d/1D-PokWv6szmbmjnHW_qpS-y3JKmEzV-d/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
-    regbyindustry = pd.read_excel('https://docs.google.com/spreadsheets/d/1q-TEGK_Gk4lW6B7Sg_TGV00oqfbfkL1Y/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true')
-    return industry_data, industry_pop, region_pop, regbyindustry
+    def to_csv_export_url(gs_url):
+        m = re.search(r"/d/([a-zA-Z0-9_-]+)", gs_url)
+        if not m:
+            return gs_url
+        sheet_id = m.group(1)
+        return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
 
-# Load data
-industry_data, industry_pop, region_pop, regbyindustry = load_data()
+    urls = {
+        "industry_data": 'https://docs.google.com/spreadsheets/d/1Swv5f8TpawfsSln29Vai5TRcA98eOE5B/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true',
+        "industry_pop": 'https://docs.google.com/spreadsheets/d/1KV3WexpuHm_h5uEsj4yY8P5OwaVH8owr/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true',
+        "region_pop":  'https://docs.google.com/spreadsheets/d/1D-PokWv6szmbmjnHW_qpS-y3JKmEzV-d/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true',
+        "regbyindustry": 'https://docs.google.com/spreadsheets/d/1q-TEGK_Gk4lW6B7Sg_TGV00oqfbfkL1Y/edit?usp=drive_link&ouid=113829564228791815939&rtpof=true&sd=true'
+    }
 
+    try:
+        industry_data = pd.read_csv(to_csv_export_url(urls["industry_data"]))
+        industry_pop  = pd.read_csv(to_csv_export_url(urls["industry_pop"]))
+        region_pop    = pd.read_csv(to_csv_export_url(urls["region_pop"]))
+        regbyindustry = pd.read_csv(to_csv_export_url(urls["regbyindustry"]))
+        return industry_data, industry_pop, region_pop, regbyindustry
+    except Exception as e:
+        st.error("Failed to load one or more Google Sheets. Ensure sheets are shared publicly or use direct CSV links.")
+        st.error(str(e))
+        return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 # Sidebar filters
 st.sidebar.header("Filters")
 selected_industry = st.sidebar.selectbox(
