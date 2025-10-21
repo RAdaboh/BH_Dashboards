@@ -63,8 +63,9 @@ st.markdown("""
 def load_data():
     try:
         url1="https://drive.google.com/file/d/1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo/view?usp=drive_link"
+        url2="https://drive.google.com/file/d/1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6/view?usp=drive_link"
         loan_disbursement_df = pd.read_csv(url1)
-        loan_repayment_df = pd.read_csv('https://drive.google.com/file/d/1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6/view?usp=drive_link')
+        loan_repayment_df = pd.read_csv(url2)
 
 
         # Clean column names (replace spaces with underscores)
