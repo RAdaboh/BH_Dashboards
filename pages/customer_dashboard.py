@@ -10,11 +10,12 @@ import plotly.express as px
 st.set_page_config(layout="wide", page_title="Customer Analytics", page_icon="📊")
 
 @st.cache_data
-def load_customer_data():
-    # Replace 'customers.csv' with your actual file path or name
-    df = pd.read_csv("C:\\Users\\Evelyn Wullar\\Desktop\\BRIGHT HORIZON\\BrightHorizon\\data\\Featured data\\bright_horizons_customers_enriched.csv", parse_dates=["Customer Since"])
-    return df
-customers = load_customer_data()
+def load_data():
+    url = "https://drive.google.com/uc?id=1yudFOERd3cvnw1xMh5utMXW6kBn04l3c"  # or Dropbox link
+    customers = pd.read_csv(url)
+    return customers
+
+customers = load_data()
 
 
 total_customers = customers['Customer ID'].nunique()
