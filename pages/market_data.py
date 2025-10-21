@@ -40,9 +40,16 @@ def load_data():
         return pd.DataFrame(), pd.DataFrame(), pd.DataFrame(), pd.DataFrame()
 # Sidebar filters
 st.sidebar.header("Filters")
+
+# Load data so the variables are defined
+industry_data, industry_pop, region_pop, regbyindustry = load_data()
+
+# Provide safe options for the selectbox if data failed to load
+industry_options = industry_pop['Industry'].unique() if not industry_pop.empty and 'Industry' in industry_pop.columns else []
+
 selected_industry = st.sidebar.selectbox(
     "Select Industry", 
-    industry_pop['Industry'].unique()
+    industry_options
 )
 
 # Main content
