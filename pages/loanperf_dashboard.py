@@ -62,19 +62,41 @@ st.markdown("""
 @st.cache_data
 def load_data():
     try:
-        url1="https://drive.google.com/file/d/1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo/view?usp=drive_link"
-        url2="https://drive.google.com/file/d/1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6/view?usp=drive_link"
-        loan_disbursement_df = pd.read_csv(url1)
-        loan_repayment_df = pd.read_csv(url2)
+        import re
 
+        def gdrive_to_uc(url: str) -> str:
+            """
+            Convert common Google Drive share URLs into a direct download URL
+            that pandas.read_csv can consume.
+            """
+            # pattern: /d/FILEID/
+            m = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+            if m:
+                fid = m.group(1)
+                return f"https://drive.google.com/uc?export=download&id={fid}"
+            # pattern: id=FILEID
+            m = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+            if m:
+                return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+            # fallback to original URL
+            return url
+
+        url1 = "https://drive.google.com/file/d/1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo/view?usp=drive_link"
+        url2 = "https://drive.google.com/file/d/1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6/view?usp=drive_link"
+
+        csv1 = gdrive_to_uc(url1)
+        csv2 = gdrive_to_uc(url2)
+
+        loan_disbursement_df = pd.read_csv(csv1)
+        loan_repayment_df = pd.read_csv(csv2)
 
         # Clean column names (replace spaces with underscores)
         loan_disbursement_df.columns = loan_disbursement_df.columns.str.replace(' ', '_')
         loan_repayment_df.columns = loan_repayment_df.columns.str.replace(' ', '_')
         
         return loan_disbursement_df, loan_repayment_df
-    except FileNotFoundError:
-        st.error("Data files not found. Please ensure the data files are in the correct location.")
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
         return None, None
 
 loan_disbursement_df, loan_repayment_df = load_data()
