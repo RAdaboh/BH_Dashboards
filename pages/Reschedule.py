@@ -17,9 +17,9 @@ st.title("🏦 Repayment Schedule & Forecast Dashboard")
 # ------------------------------
 @st.cache_data
 def load_data():
-    path = r"/Users/cogniserve/Desktop/BrightHorizon/data/cleaned/bright_horizons_repayment_schedule.csv"
+    url = "https://drive.google.com/uc?id=15ardOjcLjcrmhBH0SZu7NyflILSwEgiQ"
     try:
-        df = pd.read_csv(path)
+        df = pd.read_csv(url)
         #st.success(f"✅ Data loaded successfully! Shape: {df.shape}")
         return df
     except FileNotFoundError:
