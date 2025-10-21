@@ -16,7 +16,8 @@ st.set_page_config(page_title="Account Dashboard", layout="wide")
 # Load data
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/bright_horizons_accounts_enriched.csv")  # Update path if different
+    url = "https://drive.google.com/uc?id=1EN07O05h_FWllTunrO53wE8mBhPaOO3m"  # or Dropbox link
+    df = pd.read_csv(url) # Update path if different
     df['Opening Date'] = pd.to_datetime(df['Opening Date'], errors='coerce')
     df['Year Opened'] = df['Opening Date'].dt.year
     return df
