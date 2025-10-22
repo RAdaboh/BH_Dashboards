@@ -865,9 +865,8 @@ def main():
     st.info("📊 Loading data...")
     
     # Google Drive file IDs (replace with your actual file IDs)
-    TRANSACTIONS_FILE_ID = "https://drive.google.com/file/d/1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc/view?usp=drive_link"
-    CUSTOMERS_FILE_ID = "https://drive.google.com/file/d/1yudFOERd3cvnw1xMh5utMXW6kBn04l3c/view?usp=drive_link"
-    
+    TRANSACTIONS_FILE_ID = "1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc"
+    CUSTOMERS_FILE_ID = "1yudFOERd3cvnw1xMh5utMXW6kBn04l3c"
     transactions_df = load_data_from_drive(TRANSACTIONS_FILE_ID, "transactions data")
     customer_df = load_data_from_drive(CUSTOMERS_FILE_ID, "customer data")
     
