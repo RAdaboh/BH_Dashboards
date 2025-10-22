@@ -12,95 +12,120 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Add this at the beginning of your script (after imports but before loading data)
+# Custom CSS for styling
 st.markdown("""
 <style>
-    /* Main content text color */
-    /*.css-18e3th9 {*/
-      /*  color: #000000;*/
-    }*/
-    
-    /* Sidebar text color */
-    .css-1v3fvcr {
-        color: #000000;
+    .stMetric {
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 15px;
     }
-    
-    /* Metric labels */
     .stMetric label {
-        color: #000000 !important;
+        font-size: 14px;
+        color: #666;
     }
-    
-    /* Metric values */
     .stMetric div {
-        color: #000000 !important;
-    }
-    
-    /* Dataframe text */
-    /*.dataframe { */
-       /* color: #000000 !important; */
-    /*}*/
-    
-    
-    /* Chart text */
-    .svg-container {
-        color: #000000 !important;
+        font-size: 24px;
+        font-weight: bold;
     }
     
     /* Titles and headers */
     h1, h2, h3, h4, h5, h6 {
-        color: #ffffff !important;
-    }
-    
-    /* General text */
-    p, div {
-        color: #000000 !important;
+        color: #1f77b4 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-
 @st.cache_data
 def load_data():
     try:
-
+        # Load data from Google Drive
         loan_disbursement_df = pd.read_csv('https://drive.google.com/uc?id=1p1u6r8lKoycS73UC3jGvihtMCqLAPqWo')
         loan_repayment_df = pd.read_csv('https://drive.google.com/uc?id=1o2O6aQS2gWiz5SJuZd_d1LoBPSrQfSU6')
 
-
-        # Clean column names (replace spaces with underscores)
-        loan_disbursement_df.columns = loan_disbursement_df.columns.str.replace(' ', '_')
-        loan_repayment_df.columns = loan_repayment_df.columns.str.replace(' ', '_')
+        # Clean column names (replace spaces with underscores and make lowercase)
+        loan_disbursement_df.columns = loan_disbursement_df.columns.str.replace(' ', '_').str.lower()
+        loan_repayment_df.columns = loan_repayment_df.columns.str.replace(' ', '_').str.lower()
         
         return loan_disbursement_df, loan_repayment_df
-    except FileNotFoundError:
-        st.error("Data files not found. Please ensure the data files are in the correct location.")
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
         return None, None
 
+# Load data with progress indicator
+st.info("🔄 Loading data...")
 loan_disbursement_df, loan_repayment_df = load_data()
 
 if loan_disbursement_df is None or loan_repayment_df is None:
+    st.error("Failed to load data. Please check the data sources.")
     st.stop()
 
-# Sidebar
+# Display data info for debugging
+with st.sidebar:
+    st.subheader("📊 Data Info")
+    st.write(f"Disbursement data shape: {loan_disbursement_df.shape}")
+    st.write(f"Repayment data shape: {loan_repayment_df.shape}")
+    
+    with st.expander("View Columns"):
+        st.write("**Disbursement Columns:**", list(loan_disbursement_df.columns))
+        st.write("**Repayment Columns:**", list(loan_repayment_df.columns))
+
+# Helper function to find column names
+def find_column(df, possible_names):
+    """Find a column in dataframe from list of possible names"""
+    for name in possible_names:
+        if name in df.columns:
+            return name
+    return None
+
+# Find key columns in disbursement data
+disbursement_amount_col = find_column(loan_disbursement_df, 
+                                    ['disbursement_amount', 'amount', 'loan_amount', 'disbursed_amount', 'principal'])
+region_col_disb = find_column(loan_disbursement_df, 
+                            ['region', 'region_x', 'location', 'area', 'branch_region'])
+product_col = find_column(loan_disbursement_df, 
+                        ['product_id', 'product', 'product_type', 'loan_product'])
+branch_col = find_column(loan_disbursement_df, 
+                       ['branch', 'branch_name', 'branch_code'])
+year_col_disb = find_column(loan_disbursement_df, 
+                          ['disbursement_year', 'year', 'disbursement_date', 'date'])
+
+# Find key columns in repayment data
+repayment_amount_col = find_column(loan_repayment_df, 
+                                 ['amount_paid', 'repayment_amount', 'amount', 'paid_amount', 'payment_amount'])
+region_col_repay = find_column(loan_repayment_df, 
+                             ['region', 'region_x', 'location', 'area', 'branch_region'])
+customer_id_col = find_column(loan_repayment_df, 
+                            ['customer_id', 'customer', 'client_id'])
+loan_number_col = find_column(loan_repayment_df, 
+                            ['loan_number', 'loan_id', 'loan_no'])
+outstanding_col = find_column(loan_repayment_df, 
+                            ['outstanding_balance', 'outstanding', 'balance', 'remaining_balance'])
+total_repayment_col = find_column(loan_repayment_df, 
+                                ['total_repayment', 'total_due', 'expected_repayment'])
+
+# Sidebar navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Overview", "Disbursement Analysis", "Repayment Analysis", "Performance Metrics"])
 
 # Main content
 st.title("Loan Performance Analysis Dashboard")
 
-
 if page == "Overview":
     st.header("Overview")
     
-    # Key metrics
-    total_disbursed = loan_disbursement_df['Disbursement_Amount'].sum()
-    total_loans = len(loan_disbursement_df)
-    avg_disbursement = loan_disbursement_df['Disbursement_Amount'].mean()
-    
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Loans Disbursed", f"GHC {total_disbursed:,.2f}")
-    col2.metric("Number of Loans", f"{total_loans:,}")
-    col3.metric("Average Disbursement", f"GHC {avg_disbursement:,.2f}")
+    # Key metrics - with safe column access
+    if disbursement_amount_col:
+        total_disbursed = loan_disbursement_df[disbursement_amount_col].sum()
+        total_loans = len(loan_disbursement_df)
+        avg_disbursement = loan_disbursement_df[disbursement_amount_col].mean()
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Loans Disbursed", f"GHC {total_disbursed:,.2f}")
+        col2.metric("Number of Loans", f"{total_loans:,}")
+        col3.metric("Average Disbursement", f"GHC {avg_disbursement:,.2f}")
+    else:
+        st.warning("Disbursement amount column not found. Cannot display key metrics.")
     
     st.write("---")
     
@@ -120,31 +145,44 @@ if page == "Overview":
 elif page == "Disbursement Analysis":
     st.header("Loan Disbursement Analysis")
     
+    if not disbursement_amount_col:
+        st.error("Disbursement amount column not found in the data.")
+        st.stop()
+    
     # Total by Region
-    st.subheader("Disbursement by Region")
-    
-    region_totals = loan_disbursement_df.groupby('Region')['Disbursement_Amount'].sum().sort_values(ascending=False)
-    
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        fig = px.bar(region_totals, 
-                     x=region_totals.index, 
-                     y=region_totals.values,
-                     labels={'y': 'Total Disbursement (GHC)', 'x': 'Region'},
-                     title='Total Disbursement by Region')
-        st.plotly_chart(fig, use_container_width=True)
-    
-    with col2:
-        st.dataframe(region_totals.apply(lambda x: f"GHC {x:,.2f}").rename("Total Disbursement"))
-    
-    st.write("---")
+    if region_col_disb:
+        st.subheader("Disbursement by Region")
+        
+        region_totals = loan_disbursement_df.groupby(region_col_disb)[disbursement_amount_col].sum().sort_values(ascending=False)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            fig = px.bar(region_totals, 
+                         x=region_totals.index, 
+                         y=region_totals.values,
+                         labels={'y': 'Total Disbursement (GHC)', 'x': 'Region'},
+                         title='Total Disbursement by Region')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.dataframe(region_totals.apply(lambda x: f"GHC {x:,.2f}").rename("Total Disbursement"))
+        
+        st.write("---")
     
     # Total by Year (if available)
-    if 'Disbursement_Year' in loan_disbursement_df.columns:
+    if year_col_disb:
         st.subheader("Disbursement by Year")
         
-        yearly_totals = loan_disbursement_df.groupby('Disbursement_Year')['Disbursement_Amount'].sum()
+        # If it's a date column, extract year
+        if loan_disbursement_df[year_col_disb].dtype == 'object':
+            try:
+                loan_disbursement_df['year_extracted'] = pd.to_datetime(loan_disbursement_df[year_col_disb]).dt.year
+                yearly_totals = loan_disbursement_df.groupby('year_extracted')[disbursement_amount_col].sum()
+            except:
+                yearly_totals = loan_disbursement_df.groupby(year_col_disb)[disbursement_amount_col].sum()
+        else:
+            yearly_totals = loan_disbursement_df.groupby(year_col_disb)[disbursement_amount_col].sum()
         
         col1, col2 = st.columns([2, 1])
         
@@ -158,12 +196,14 @@ elif page == "Disbursement Analysis":
         
         with col2:
             st.dataframe(yearly_totals.apply(lambda x: f"GHC {x:,.2f}").rename("Total Disbursement"))
+        
+        st.write("---")
     
     # Total by Product (if available)
-    if 'Product_ID' in loan_disbursement_df.columns:
+    if product_col:
         st.subheader("Disbursement by Product")
         
-        product_totals = loan_disbursement_df.groupby('Product_ID')['Disbursement_Amount'].sum().sort_values(ascending=False)
+        product_totals = loan_disbursement_df.groupby(product_col)[disbursement_amount_col].sum().sort_values(ascending=False)
         
         col1, col2 = st.columns([2, 1])
         
@@ -176,252 +216,220 @@ elif page == "Disbursement Analysis":
         
         with col2:
             st.dataframe(product_totals.apply(lambda x: f"GHC {x:,.2f}").rename("Total Disbursement"))
+        
+        st.write("---")
     
     # Total by Branch (if available)
-    if 'Branch' in loan_disbursement_df.columns:
+    if branch_col:
         st.subheader("Disbursement by Branch")
         
-        branch_totals = loan_disbursement_df.groupby('Branch')['Disbursement_Amount'].sum().sort_values(ascending=False)
+        branch_totals = loan_disbursement_df.groupby(branch_col)[disbursement_amount_col].sum().sort_values(ascending=False)
         
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            fig = px.bar(branch_totals, 
-                         x=branch_totals.index, 
-                         y=branch_totals.values,
+            fig = px.bar(branch_totals.head(10),  # Show top 10 only
+                         x=branch_totals.head(10).index, 
+                         y=branch_totals.head(10).values,
                          labels={'y': 'Total Disbursement (GHC)', 'x': 'Branch'},
-                         title='Total Disbursement by Branch')
+                         title='Total Disbursement by Branch (Top 10)')
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.dataframe(branch_totals.apply(lambda x: f"GHC {x:,.2f}").rename("Total Disbursement"))
-    
-    
-    #####HERE######
+
 elif page == "Repayment Analysis":
     st.header("Loan Repayment Analysis")
     
-    # Check what columns are available in repayment data
-    #st.write("Available columns in repayment data:", list(loan_repayment_df.columns))
+    if not repayment_amount_col:
+        st.error("Repayment amount column not found in the data.")
+        st.stop()
     
-    # Check if there's any amount column that could represent repayments
-    amount_columns = [col for col in loan_repayment_df.columns if 'amount' in col.lower() or 'repayment' in col.lower()]
+    # Calculate repayment metrics
+    total_repayments = loan_repayment_df[repayment_amount_col].sum()
+    avg_repayment = loan_repayment_df[repayment_amount_col].mean()
     
-    if not amount_columns:
-        st.warning("No repayment amount column found in the dataset. Please check your data.")
-        st.write("Common column names to check for repayment amounts:")
-        st.write("- Repayment_Amount")
-        st.write("- Amount")
-        st.write("- Payment_Amount")
-        st.write("- Repaid_Amount")
-    else:
-        # Use the first amount column found
-        repayment_col = amount_columns[0]
-        #st.subheader(f"Total Repayments (using column: {repayment_col})")
+    col1, col2 = st.columns(2)
+    col1.metric("Total Repayments", f"GHC {total_repayments:,.2f}")
+    col2.metric("Average Repayment", f"GHC {avg_repayment:,.2f}")
+    
+    st.write("---")
+    
+    # Repayment by Region (if available)
+    if region_col_repay:
+        st.subheader("Repayment by Region")
         
-        total_repayments = loan_repayment_df[repayment_col].sum()
-        avg_repayment = loan_repayment_df[repayment_col].mean()
+        repayment_by_region = loan_repayment_df.groupby(region_col_repay)[repayment_amount_col].sum().sort_values(ascending=False)
         
-        col1, col2 = st.columns(2)
-        col1.metric("Total Repayments", f"GHC {total_repayments:,.2f}")
-        col2.metric("Average Repayment", f"GHC {avg_repayment:,.2f}")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            fig = px.bar(repayment_by_region, 
+                         x=repayment_by_region.index, 
+                         y=repayment_by_region.values,
+                         labels={'y': 'Total Repayment (GHC)', 'x': 'Region'},
+                         title='Total Repayment by Region')
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            st.dataframe(repayment_by_region.apply(lambda x: f"GHC {x:,.2f}").rename("Total Repayment"))
         
         st.write("---")
+    
+    # Repayment over time (if date column available)
+    date_cols_repay = [col for col in loan_repayment_df.columns if 'date' in col.lower() or 'month' in col.lower()]
+    if date_cols_repay:
+        date_col = date_cols_repay[0]
+        st.subheader(f"Repayment Over Time")
         
-        # Repayment by Region (if available)
-        if 'Region' in loan_repayment_df.columns:
-            st.subheader("Repayment by Region")
+        try:
+            # Try to extract month/year from date column
+            loan_repayment_df['repayment_period'] = pd.to_datetime(loan_repayment_df[date_col]).dt.to_period('M')
+            repayment_by_period = loan_repayment_df.groupby('repayment_period')[repayment_amount_col].sum()
             
-            repayment_by_region = loan_repayment_df.groupby('Region')[repayment_col].sum().sort_values(ascending=False)
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                fig = px.bar(repayment_by_region, 
-                             x=repayment_by_region.index, 
-                             y=repayment_by_region.values,
-                             labels={'y': 'Total Repayment (GHC)', 'x': 'Region'},
-                             title='Total Repayment by Region')
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.dataframe(repayment_by_region.apply(lambda x: f"GHC {x:,.2f}").rename("Total Repayment"))
-        
-        # Repayment by Year (if available)
-        year_cols = [col for col in loan_repayment_df.columns if 'year' in col.lower() or 'date' in col.lower()]
-        if year_cols:
-            year_col = year_cols[0]
-            st.subheader(f"Repayment by {year_col}")
-            
-            repayment_by_year = loan_repayment_df.groupby(year_col)[repayment_col].sum()
-            
-            col1, col2 = st.columns([2, 1])
-            
-            with col1:
-                fig = px.line(repayment_by_year, 
-                              x=repayment_by_year.index, 
-                              y=repayment_by_year.values,
-                              labels={'y': 'Total Repayment (GHC)', 'x': year_col},
-                              title=f'Repayment Trend Over {year_col}')
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.dataframe(repayment_by_year.apply(lambda x: f"GHC {x:,.2f}").rename("Total Repayment"))
+            fig = px.line(repayment_by_period, 
+                          x=repayment_by_period.index.astype(str), 
+                          y=repayment_by_period.values,
+                          labels={'y': 'Total Repayment (GHC)', 'x': 'Period'},
+                          title='Repayment Trend Over Time')
+            st.plotly_chart(fig, use_container_width=True)
+        except:
+            st.warning("Could not parse date column for time series analysis.")
 
 elif page == "Performance Metrics":
     st.header("Loan Performance Metrics")
     
-    # Check what columns are available in both datasets
-    #st.write("Available columns in disbursement data:", list(loan_disbursement_df.columns))
-    #st.write("Available columns in repayment data:", list(loan_repayment_df.columns))
+    # Check if we have the required columns
+    if not disbursement_amount_col or not repayment_amount_col:
+        st.error("Required amount columns not found for performance metrics.")
+        st.stop()
     
-    # Find potential amount columns
-    disb_amount_cols = [col for col in loan_disbursement_df.columns if 'amount' in col.lower() or 'disbursement' in col.lower()]
-    repay_amount_cols = [col for col in loan_repayment_df.columns if 'amount' in col.lower() or 'repayment' in col.lower() or 'paid' in col.lower()]
+    # Convert amount columns to numeric
+    try:
+        loan_disbursement_df[disbursement_amount_col] = pd.to_numeric(loan_disbursement_df[disbursement_amount_col], errors='coerce')
+        loan_repayment_df[repayment_amount_col] = pd.to_numeric(loan_repayment_df[repayment_amount_col], errors='coerce')
+    except Exception as e:
+        st.error(f"Error converting amounts to numbers: {e}")
+        st.stop()
     
-    if not disb_amount_cols or not repay_amount_cols:
-        st.warning("Required amount columns not found in one or both datasets.")
-        st.write("Please ensure your datasets contain columns representing disbursement and repayment amounts.")
-    else:
-        # Use the most relevant amount columns found
-        disb_col = 'Disbursement_Amount'  # We know this exists from your data
-        repay_col = 'Amount_Paid'  # Using Amount_Paid instead of Amount_Due
-        
-        # Convert amount columns to numeric, handling any errors
+    # Calculate key metrics
+    total_disbursed = loan_disbursement_df[disbursement_amount_col].sum()
+    total_repaid = loan_repayment_df[repayment_amount_col].sum()
+    
+    # Calculate total expected repayment if available
+    total_expected_repayment = 0
+    if total_repayment_col:
         try:
-            loan_disbursement_df[disb_col] = pd.to_numeric(loan_disbursement_df[disb_col], errors='coerce')
-            loan_repayment_df[repay_col] = pd.to_numeric(loan_repayment_df[repay_col], errors='coerce')
-        except Exception as e:
-            st.error(f"Error converting amounts to numbers: {e}")
-            st.stop()
-        
-        #st.subheader("Key Performance Metrics")
-        #st.write(f"Using disbursement column: {disb_col}")
-        #st.write(f"Using repayment column: {repay_col}")
-        
-        # Calculate totals after converting to numeric
-        total_disbursed = loan_disbursement_df[disb_col].sum()
-        total_repaid = loan_repayment_df[repay_col].sum()
-        total_repayment_sum = loan_disbursement_df['Total_Repayment'].sum()
-
-        min_outstanding_per_loan = (
-            loan_repayment_df
-            .groupby(['Customer_ID', 'Loan_Number'])['Outstanding_Balance']
-            .min()
-            .reset_index()
-        )
-
-        # Sum up all the minimum outstanding balances
-        total_min_outstanding_balance = min_outstanding_per_loan['Outstanding_Balance'].sum()
-
-        
-        # Simple repayment rate (this is a simplified calculation)
-        try:
-            repayment_rate = (total_repaid / total_disbursed) * 100 if total_disbursed > 0 else 0
-        except Exception as e:
-            st.error(f"Error calculating repayment rate: {e}")
-            repayment_rate = 0
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Disbursed", f"GHC {total_disbursed:,.2f}")
-        col2.metric("Expected Repayment", f"GHC {total_repayment_sum:,.2f}")
-        col3.metric("Total Repaid", f"GHC {total_repaid:,.2f}")
-
+            loan_repayment_df[total_repayment_col] = pd.to_numeric(loan_repayment_df[total_repayment_col], errors='coerce')
+            total_expected_repayment = loan_repayment_df[total_repayment_col].sum()
+        except:
+            total_expected_repayment = total_disbursed * 1.2  # Estimate if not available
     
+    # Calculate outstanding balance
+    total_outstanding = 0
+    if customer_id_col and loan_number_col and outstanding_col:
+        try:
+            loan_repayment_df[outstanding_col] = pd.to_numeric(loan_repayment_df[outstanding_col], errors='coerce')
+            min_outstanding_per_loan = (
+                loan_repayment_df
+                .groupby([customer_id_col, loan_number_col])[outstanding_col]
+                .min()
+                .reset_index()
+            )
+            total_outstanding = min_outstanding_per_loan[outstanding_col].sum()
+        except:
+            total_outstanding = total_expected_repayment - total_repaid
+    
+    # Calculate repayment rate
+    try:
+        repayment_rate = (total_repaid / total_expected_repayment) * 100 if total_expected_repayment > 0 else 0
+    except:
+        repayment_rate = 0
+    
+    # Display metrics
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Disbursed", f"GHC {total_disbursed:,.2f}")
+    col2.metric("Expected Repayment", f"GHC {total_expected_repayment:,.2f}")
+    col3.metric("Total Repaid", f"GHC {total_repaid:,.2f}")
+    
+    col4, col5, col6 = st.columns(3)
+    col4.metric("Outstanding Balance", f"GHC {total_outstanding:,.2f}")
+    col5.metric("Repayment Rate", f"{repayment_rate:.2f}%")
+    
+    # Calculate penalties (simplified - repaid more than disbursed)
+    penalties = total_repaid - total_disbursed if total_repaid > total_disbursed else 0
+    col6.metric("Penalties/Interest", f"GHC {penalties:,.2f}")
+    
+    st.write("---")
+    
+    # Regional comparison if both datasets have region columns
+    if region_col_disb and region_col_repay:
+        st.subheader("Performance by Region")
         
+        disbursement_by_region = loan_disbursement_df.groupby(region_col_disb)[disbursement_amount_col].sum()
+        repayment_by_region = loan_repayment_df.groupby(region_col_repay)[repayment_amount_col].sum()
         
-        st.write("---")
-
-        ###############################
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Outstanding balance", f"GHC {total_min_outstanding_balance:,.2f}")
-        col2.metric("Penalties Paid", f"GHC {(total_repaid - total_disbursed):,.2f}" if total_repaid > total_disbursed else "GHC 0.00")
-        col3.metric("Repayment Rate", f"{repayment_rate:.2f}%")
-        #col4.metric("Penalties Paid", f"GHC {(total_repaid - total_disbursed):,.2f}" if total_repaid > total_disbursed else "GHC 0.00")
+        # Create comparison DataFrame
+        comparison_df = pd.DataFrame({
+            'Disbursement': disbursement_by_region,
+            'Repayment': repayment_by_region
+        }).fillna(0)
         
-        st.write("---")
-
-        # Repayment vs Disbursement by Region (if both datasets have Region)
-        region_col_disb = 'Region' if 'Region' in loan_disbursement_df.columns else None
-        region_col_repay = 'Region' if 'Region' in loan_repayment_df.columns else None
+        # Calculate repayment rate by region
+        comparison_df['Repayment_Rate'] = (comparison_df['Repayment'] / comparison_df['Disbursement'] * 100).round(2)
         
-        if region_col_disb and region_col_repay:
-            st.subheader("Repayment vs Disbursement by Region")
-            
-            disbursement_by_region = loan_disbursement_df.groupby(region_col_disb)[disb_col].sum()
-            repayment_by_region = loan_repayment_df.groupby(region_col_repay)[repay_col].sum()
-            
-            # Create a combined DataFrame
-            comparison_df = pd.DataFrame({
-                'Disbursement': disbursement_by_region,
-                'Repayment': repayment_by_region
-            }).reset_index()
-            
-            # Melt for plotting
-            melted_df = comparison_df.melt(id_vars='Region', var_name='Type', value_name='Amount')
-            
-            fig = px.bar(melted_df, 
-                         x='Region', 
-                         y='Amount', 
-                         color='Type',
-                         barmode='group',
-                         labels={'Amount': 'Amount (GHC)', 'Region': 'Region'},
-                         title='Disbursement vs Repayment by Region')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Region column not found in one or both datasets - cannot show regional comparison.")
-        
-        ######HERE#####
-
-        
-        # Example: Assume loans are overdue if repayment is less than disbursement
-        # You'll need to implement your actual PAR calculation based on your data structure
-        par_30 = 5.2  # Example value - replace with your calculation
-        par_60 = 3.1  # Example value - replace with your calculation
-        par_90 = 1.8  # Example value - replace with your calculation
-        
-        col1, col2, col3 = st.columns(3)
-        col1.metric("PAR 30 Days", f"{par_30}%")
-        col2.metric("PAR 60 Days", f"{par_60}%")
-        col3.metric("PAR 90 Days", f"{par_90}%")
-        
-        # PAR trend chart (example)
-        par_data = {
-            'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
-            'PAR 30': [6.1, 5.8, 5.5, 5.3, 5.2, 5.0],
-            'PAR 60': [3.5, 3.4, 3.3, 3.2, 3.1, 3.0],
-            'PAR 90': [2.0, 1.9, 1.9, 1.8, 1.8, 1.7]
-        }
-        
-        par_df = pd.DataFrame(par_data)
-        melted_par_df = par_df.melt(id_vars='Month', var_name='PAR Type', value_name='Percentage')
-        
-        fig = px.line(melted_par_df, 
-                      x='Month', 
-                      y='Percentage', 
-                      color='PAR Type',
-                      labels={'Percentage': 'PAR (%)', 'Month': 'Month'},
-                      title='PAR Trend Over Time')
+        fig = px.bar(comparison_df.reset_index(), 
+                     x=region_col_disb, 
+                     y='Repayment_Rate',
+                     labels={'Repayment_Rate': 'Repayment Rate (%)', region_col_disb: 'Region'},
+                     title='Repayment Rate by Region')
         st.plotly_chart(fig, use_container_width=True)
     
-else:
-    st.warning("Required columns not available for performance metrics calculation.")
+    # PAR metrics (simplified example)
+    st.subheader("Portfolio at Risk (PAR)")
+    
+    # Example PAR values - in a real scenario, you'd calculate these based on overdue loans
+    par_data = {
+        'Days': [30, 60, 90],
+        'PAR (%)': [5.2, 3.1, 1.8]
+    }
+    
+    par_df = pd.DataFrame(par_data)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        fig = px.bar(par_df, 
+                     x='Days', 
+                     y='PAR (%)',
+                     title='Portfolio at Risk by Days Past Due',
+                     labels={'Days': 'Days Past Due'})
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        st.dataframe(par_df)
+    
+    # PAR trend over time (example data)
+    st.subheader("PAR Trend Over Time")
+    
+    par_trend_data = {
+        'Month': ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+        'PAR 30': [6.1, 5.8, 5.5, 5.3, 5.2, 5.0],
+        'PAR 60': [3.5, 3.4, 3.3, 3.2, 3.1, 3.0],
+        'PAR 90': [2.0, 1.9, 1.9, 1.8, 1.8, 1.7]
+    }
+    
+    par_trend_df = pd.DataFrame(par_trend_data)
+    melted_par_df = par_trend_df.melt(id_vars='Month', var_name='PAR Type', value_name='Percentage')
+    
+    fig = px.line(melted_par_df, 
+                  x='Month', 
+                  y='Percentage', 
+                  color='PAR Type',
+                  labels={'Percentage': 'PAR (%)', 'Month': 'Month'},
+                  title='PAR Trend Over Time')
+    st.plotly_chart(fig, use_container_width=True)
 
-# Add some styling
-st.markdown("""
-<style>
-    .stMetric {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 15px;
-    }
-    .stMetric label {
-        font-size: 14px;
-        color: #666;
-    }
-    .stMetric div {
-        font-size: 24px;
-        font-weight: bold;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Footer
+st.markdown("---")
+st.markdown("Loan Performance Analysis Dashboard | Built with Streamlit")
