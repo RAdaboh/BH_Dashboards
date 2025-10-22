@@ -13,24 +13,21 @@ st.title("Loan Product Profitability Dashboard")
 @st.cache_data
 def load_data():
     try:
-        # Try loading from Parquet if available (faster)
-        parquet_url = "https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=sharing"
-        st.info("🔄 Loading data from Parquet...")
-        df = pd.read_parquet(parquet_url)
-        st.success(f"✅ Successfully loaded data from Parquet! Shape: {df.shape}")
+        # CORRECT Google Drive URL format for direct download
+        csv_url = "https://drive.google.com/uc?id=1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM"
+        st.info("🔄 Loading data from CSV...")
+        df = pd.read_csv(csv_url)
+        st.success(f"✅ Successfully loaded data from CSV! Shape: {df.shape}")
         return df
     except Exception as e:
-        st.warning(f"⚠️ Parquet loading failed: {e}")
-        # Fallback to CSV if Parquet fails
-        try:
-            csv_url = "https://drive.google.com/uc?id=1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM&export=download"
-            st.info("🔄 Loading data from CSV...")
-            df = pd.read_csv(csv_url)
-            st.success(f"✅ Successfully loaded data from CSV! Shape: {df.shape}")
-            return df
-        except Exception as e:
-            st.error(f"❌ Failed to load dataset: {e}")
-            return pd.DataFrame()
+        st.error(f"❌ Failed to load dataset: {e}")
+        st.info("""
+        **Troubleshooting tips:**
+        1. Make sure your Google Drive file is set to "Anyone with the link can view"
+        2. Use the correct file ID in the URL
+        3. Ensure the file is a valid CSV file
+        """)
+        return pd.DataFrame()
 
 @st.cache_data
 def preprocess_data(df):
@@ -62,8 +59,8 @@ def preprocess_data(df):
     }).reset_index()
 
     grouped['Profit'] = grouped['Total_Revenue'] - grouped['Total_Default_Amount']
-    grouped['Profit_Margin_%'] = (grouped['Profit'] / grouped['Total_Revenue']) * 100
-    grouped['Default_Rate_%'] = (grouped['Total_Default_Amount'] / grouped['Total_Disbursed']) * 100
+    grouped['Profit_Margin_%'] = (grouped['Profit'] / grouped['Total_Revenue'].replace(0, 1)) * 100
+    grouped['Default_Rate_%'] = (grouped['Total_Default_Amount'] / grouped['Total_Disbursed'].replace(0, 1)) * 100
 
     return grouped
 
@@ -85,6 +82,12 @@ st.sidebar.write(f"Total rows: {len(df):,}")
 st.sidebar.write(f"Products: {len(grouped['Product_Name'].unique())}")
 st.sidebar.write(f"Years: {grouped['Disbursement_Year'].min()} - {grouped['Disbursement_Year'].max()}")
 st.sidebar.write(f"Regions: {len(grouped['Region_x'].unique())}")
+
+# Display column information for debugging
+with st.expander("🔍 View Data Structure"):
+    st.write("**Columns in dataset:**", list(df.columns))
+    st.write("**First few rows:**")
+    st.dataframe(df.head())
 
 # --- SIDEBAR FILTERS ---
 with st.sidebar:
