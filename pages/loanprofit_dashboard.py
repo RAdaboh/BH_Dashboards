@@ -11,7 +11,7 @@ st.title("Loan Product Profitability Dashboard")
 # --- DATA LOADING AND CACHING ---
 
 @st.cache_data
-def load_data(parquet_path="loan_performance.parquet", csv_path="/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/loan_performance.csv"):
+def load_data(parquet_path="https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=drive_link", csv_path="/https://drive.google.com/file/d/1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM/view?usp=drive_link"):
     if os.path.exists(parquet_path):
         return pd.read_parquet(parquet_path)
     elif os.path.exists(csv_path):
