@@ -76,7 +76,7 @@ class EnhancedTransactionDashboard:
         """Prepare and clean data for analysis"""
         # Convert dates
         self.transactions_df['Transaction_Date'] = pd.to_datetime(self.transactions_df['Transaction_Date'])
-        self.transactions_df['Value_Date'] = pd.to_datetime(self.transactions_df['Value_Date'], errors='coerce')
+        self.transactions_df['Value_Date'] = pd.to_datetime(self.transactions_df.get('Value_Date', self.transactions_df['Transaction_Date']), errors='coerce')
         
         # Create time-based features
         self.transactions_df['Transaction_Hour'] = self.transactions_df['Transaction_Date'].dt.hour
