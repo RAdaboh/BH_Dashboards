@@ -31,8 +31,14 @@ load_css()
 # Load data
 @st.cache_data
 def load_data():
-    transactions_df = pd.read_csv('/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_transaction_recs_enriched.csv')
-    customer_df = pd.read_csv('/Users/cogniserve/Desktop/BrightHorizon/data/Featured data/bright_horizons_customers_enriched.csv')
+    transactions_file_id = '1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc'
+    customer_file_id = '1T6vNJOlk43to_uWtgva4dAEb6hSncVZc'
+
+    transactions_url = f'https://drive.google.com/uc?export=download&id={transactions_file_id}'
+    customer_url = f'https://drive.google.com/uc?export=download&id={customer_file_id}'
+
+    transactions_df = pd.read_csv(transactions_url)
+    customer_df = pd.read_csv(customer_url)
     
     # Convert date columns
     transactions_df['Transaction_Date'] = pd.to_datetime(transactions_df['Transaction_Date'])
