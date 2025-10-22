@@ -15,14 +15,18 @@ def load_data():
     try:
         # Try loading from Parquet if available (faster)
         parquet_url = "https://drive.google.com/uc?id=1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr"
+        st.info("🔄 Loading data from Parquet...")
         df = pd.read_parquet(parquet_url)
+        st.success(f"✅ Successfully loaded data from Parquet! Shape: {df.shape}")
         return df
-    except Exception:
+    except Exception as e:
+        st.warning(f"⚠️ Parquet loading failed: {e}")
         # Fallback to CSV if Parquet fails
-        csv_url = "https://drive.google.com/uc?id=1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM"
         try:
+            csv_url = "https://drive.google.com/uc?id=1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM"
+            st.info("🔄 Loading data from CSV...")
             df = pd.read_csv(csv_url)
-            df.to_parquet("loan_data.parquet", index=False)
+            st.success(f"✅ Successfully loaded data from CSV! Shape: {df.shape}")
             return df
         except Exception as e:
             st.error(f"❌ Failed to load dataset: {e}")
@@ -63,12 +67,24 @@ def preprocess_data(df):
 
     return grouped
 
-# Load and preprocess
+# Load and preprocess with progress indicators
+st.info("🔄 Loading data...")
 df = load_data()
+
 if df.empty:
+    st.error("❌ No data loaded. Please check your data sources.")
     st.stop()
 
+st.info("🔄 Preprocessing data...")
 grouped = preprocess_data(df)
+
+# Show data info for debugging
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Data Info")
+st.sidebar.write(f"Total rows: {len(df):,}")
+st.sidebar.write(f"Products: {len(grouped['Product_Name'].unique())}")
+st.sidebar.write(f"Years: {grouped['Disbursement_Year'].min()} - {grouped['Disbursement_Year'].max()}")
+st.sidebar.write(f"Regions: {len(grouped['Region_x'].unique())}")
 
 # --- SIDEBAR FILTERS ---
 with st.sidebar:
@@ -88,20 +104,31 @@ filtered_df = grouped[
     (grouped['Region_x'].isin(region_filter))
 ]
 
+# Check if filtered data is empty
+if filtered_df.empty:
+    st.warning("⚠️ No data matches your filter criteria. Please adjust your filters.")
+    st.stop()
+
 # --- PLOTTING FUNCTION ---
 def plot_line(data, y_col, title, ylabel):
     fig, ax = plt.subplots(figsize=(10, 5))
-    sns.lineplot(data=data, x='Disbursement_Year', y=y_col, hue='Product_Name', marker='o', ax=ax)
-    ax.set_title(title)
-    ax.set_ylabel(ylabel)
-    ax.set_xlabel("Year")
-    ax.legend(title='Product Name', bbox_to_anchor=(1.05, 1), loc='upper left')
-
-    # ✅ Fix: Force integer x-ticks to avoid decimal years
-    ax.set_xticks(sorted(data['Disbursement_Year'].unique()))
-    plt.setp(ax.get_xticklabels(), rotation=45)
-
-
+    
+    # Check if there's data to plot
+    if data.empty:
+        ax.text(0.5, 0.5, 'No data to display', ha='center', va='center', transform=ax.transAxes)
+        ax.set_title(title)
+    else:
+        sns.lineplot(data=data, x='Disbursement_Year', y=y_col, hue='Product_Name', marker='o', ax=ax)
+        ax.set_title(title)
+        ax.set_ylabel(ylabel)
+        ax.set_xlabel("Year")
+        ax.legend(title='Product Name', bbox_to_anchor=(1.05, 1), loc='upper left')
+        
+        # Set integer x-ticks
+        years = sorted(data['Disbursement_Year'].unique())
+        ax.set_xticks(years)
+        plt.setp(ax.get_xticklabels(), rotation=45)
+    
     st.pyplot(fig)
 
 # --- DASHBOARD SECTIONS ---
@@ -120,28 +147,30 @@ with col3:
 with col4:
     plot_line(filtered_df, 'Total_Interest', 'Interest Paid by Product', 'Interest Paid (GHS)')
 
-st.markdown("##  Top 5 Most Profitable Products")
+st.markdown("## 🏆 Top 5 Most Profitable Products")
 
 top_products = grouped.groupby('Product_Name')['Profit'].mean().nlargest(5).index
 filtered_top = grouped[grouped['Product_Name'].isin(top_products)]
 
-fig, ax = plt.subplots(figsize=(10, 5))
-sns.lineplot(data=filtered_top, x='Disbursement_Year', y='Profit', hue='Product_Name', marker='o', ax=ax)
-ax.set_title("Profit Trend for Top 5 Products")
-ax.set_ylabel("Profit (GHS)")
-plt.setp(ax.get_xticklabels(), rotation=45)
-
-
-# ✅ Fix: Remove decimal years from x-axis
-ax.set_xticks(sorted(filtered_top['Disbursement_Year'].unique()))
-plt.setp(ax.get_xticklabels(), rotation=45)
-
-
-st.pyplot(fig)
+if not filtered_top.empty:
+    fig, ax = plt.subplots(figsize=(10, 5))
+    sns.lineplot(data=filtered_top, x='Disbursement_Year', y='Profit', hue='Product_Name', marker='o', ax=ax)
+    ax.set_title("Profit Trend for Top 5 Products")
+    ax.set_ylabel("Profit (GHS)")
+    
+    # Set integer x-ticks
+    years = sorted(filtered_top['Disbursement_Year'].unique())
+    ax.set_xticks(years)
+    plt.setp(ax.get_xticklabels(), rotation=45)
+    
+    st.pyplot(fig)
+else:
+    st.warning("No data available for top products analysis.")
 
 st.markdown("## 📋 Filtered Data Preview (Top 100 Rows)")
 st.dataframe(filtered_df.head(100))
 
 # Download button
-csv_data = filtered_df.to_csv(index=False).encode('utf-8')
-st.download_button("📥 Download Full Filtered Data", csv_data, "filtered_profitability.csv")
+if not filtered_df.empty:
+    csv_data = filtered_df.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Download Full Filtered Data", csv_data, "filtered_profitability.csv")
