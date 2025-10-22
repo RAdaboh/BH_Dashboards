@@ -5,10 +5,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 import io
+import requests
+from io import StringIO
 
 # Set page configuration
 st.set_page_config(
-    page_title="Bright  Transaction Analytics Dashboard",
+    page_title="Bright Transaction Analytics Dashboard",
     page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -74,9 +76,27 @@ class EnhancedTransactionDashboard:
         
     def setup_data(self):
         """Prepare and clean data for analysis"""
-        # Convert dates
-        self.transactions_df['Transaction_Date'] = pd.to_datetime(self.transactions_df.get('Transaction_Date', pd.Timestamp.now()), errors='coerce')
-        self.transactions_df['Value_Date'] = pd.to_datetime(self.transactions_df.get('Value_Date', self.transactions_df['Transaction_Date']), errors='coerce')
+        # Convert dates with safe column access
+        date_column = 'Transaction_Date'
+        if date_column not in self.transactions_df.columns:
+            # Try to find alternative date columns
+            date_columns = [col for col in self.transactions_df.columns if 'date' in col.lower() or 'time' in col.lower()]
+            if date_columns:
+                date_column = date_columns[0]
+                st.info(f"Using '{date_column}' as transaction date column")
+            else:
+                # Create a dummy date column if none exists
+                self.transactions_df['Transaction_Date'] = pd.to_datetime('2023-01-01')
+                st.warning("No date column found. Using default date.")
+                return
+        
+        self.transactions_df['Transaction_Date'] = pd.to_datetime(self.transactions_df[date_column], errors='coerce')
+        
+        # Handle Value_Date safely
+        if 'Value_Date' in self.transactions_df.columns:
+            self.transactions_df['Value_Date'] = pd.to_datetime(self.transactions_df['Value_Date'], errors='coerce')
+        else:
+            self.transactions_df['Value_Date'] = self.transactions_df['Transaction_Date']
         
         # Create time-based features
         self.transactions_df['Transaction_Hour'] = self.transactions_df['Transaction_Date'].dt.hour
@@ -101,24 +121,40 @@ class EnhancedTransactionDashboard:
             self.transactions_df['Account_Type'] = self.transactions_df['Account_Number'].str[:3]
         
         # Merge with customer data if available
-        if self.customer_df is not None:
+        if self.customer_df is not None and len(self.customer_df) > 0:
             try:
+                # Find customer ID column in transactions
+                customer_id_col = 'Customer_ID'
+                if customer_id_col not in self.transactions_df.columns:
+                    cust_cols = [col for col in self.transactions_df.columns if 'customer' in col.lower() or 'cust' in col.lower()]
+                    if cust_cols:
+                        customer_id_col = cust_cols[0]
+                
+                # Find customer ID column in customer data
+                customer_df_id_col = 'Customer ID'
+                if customer_df_id_col not in self.customer_df.columns:
+                    cust_df_cols = [col for col in self.customer_df.columns if 'customer' in col.lower() or 'cust' in col.lower()]
+                    if cust_df_cols:
+                        customer_df_id_col = cust_df_cols[0]
+                
                 self.merged_data = self.transactions_df.merge(
                     self.customer_df, 
-                    left_on='Customer_ID', 
-                    right_on='Customer ID', 
+                    left_on=customer_id_col, 
+                    right_on=customer_df_id_col, 
                     how='left'
                 )
                 
-                # Create demographic segments
-                income_bins = [0, 2000, 5000, 10000, 20000, np.inf]
-                income_labels = ['Low (<2K)', 'Lower Middle (2K-5K)', 'Middle (5K-10K)', 'Upper Middle (10K-20K)', 'High (>20K)']
-                self.merged_data['Income_Bracket'] = pd.cut(self.merged_data['Monthly Income (GHS)'], 
-                                                           bins=income_bins, labels=income_labels)
+                # Create demographic segments if columns exist
+                if 'Monthly Income (GHS)' in self.merged_data.columns:
+                    income_bins = [0, 2000, 5000, 10000, 20000, np.inf]
+                    income_labels = ['Low (<2K)', 'Lower Middle (2K-5K)', 'Middle (5K-10K)', 'Upper Middle (10K-20K)', 'High (>20K)']
+                    self.merged_data['Income_Bracket'] = pd.cut(self.merged_data['Monthly Income (GHS)'], 
+                                                               bins=income_bins, labels=income_labels)
                 
-                age_bins = [18, 25, 35, 45, 55, 65, 100]
-                age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
-                self.merged_data['Age_Cohort'] = pd.cut(self.merged_data['Age'], bins=age_bins, labels=age_labels)
+                if 'Age' in self.merged_data.columns:
+                    age_bins = [18, 25, 35, 45, 55, 65, 100]
+                    age_labels = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+']
+                    self.merged_data['Age_Cohort'] = pd.cut(self.merged_data['Age'], bins=age_bins, labels=age_labels)
                 
                 # Urban vs Rural classification
                 major_urban_centers = ['Accra', 'Kumasi', 'Tamale', 'Sekondi-Takoradi', 'Sunyani', 
@@ -142,15 +178,29 @@ class EnhancedTransactionDashboard:
             st.metric("Total Transactions", f"{total_transactions:,}")
             
         with col2:
-            total_amount = self.transactions_df['Transaction_Amount'].sum()
+            # Find amount column
+            amount_col = 'Transaction_Amount'
+            if amount_col not in self.transactions_df.columns:
+                amt_cols = [col for col in self.transactions_df.columns if 'amount' in col.lower() or 'amt' in col.lower()]
+                if amt_cols:
+                    amount_col = amt_cols[0]
+            
+            total_amount = self.transactions_df[amount_col].sum()
             st.metric("Total Amount", f"GHC {total_amount:,.0f}")
             
         with col3:
-            avg_transaction = self.transactions_df['Transaction_Amount'].mean()
+            avg_transaction = self.transactions_df[amount_col].mean()
             st.metric("Avg Transaction", f"GHC {avg_transaction:,.2f}")
             
         with col4:
-            unique_customers = self.transactions_df['Customer_ID'].nunique()
+            # Find customer ID column
+            customer_id_col = 'Customer_ID'
+            if customer_id_col not in self.transactions_df.columns:
+                cust_cols = [col for col in self.transactions_df.columns if 'customer' in col.lower() or 'cust' in col.lower()]
+                if cust_cols:
+                    customer_id_col = cust_cols[0]
+            
+            unique_customers = self.transactions_df[customer_id_col].nunique()
             st.metric("Unique Customers", f"{unique_customers:,}")
             
         with col5:
@@ -161,11 +211,11 @@ class EnhancedTransactionDashboard:
         col1, col2, col3, col4, col5 = st.columns(5)
         
         with col1:
-            debit_count = (self.transactions_df['Debit_Amount'] > 0).sum()
+            debit_count = (self.transactions_df['Debit_Amount'] > 0).sum() if 'Debit_Amount' in self.transactions_df.columns else 0
             st.metric("Debit Transactions", f"{debit_count:,}")
             
         with col2:
-            credit_count = (self.transactions_df['Credit_Amount'] > 0).sum()
+            credit_count = (self.transactions_df['Credit_Amount'] > 0).sum() if 'Credit_Amount' in self.transactions_df.columns else 0
             st.metric("Credit Transactions", f"{credit_count:,}")
             
         with col3:
@@ -206,10 +256,11 @@ class EnhancedTransactionDashboard:
             
         with col3:
             st.markdown('<div class="insight-box">', unsafe_allow_html=True)
-            if hasattr(self, 'merged_data'):
+            if hasattr(self, 'merged_data') and 'Monthly Income (GHS)' in self.merged_data.columns:
                 avg_income = self.merged_data['Monthly Income (GHS)'].mean()
                 st.write(f"**Avg Customer Income**: GHC {avg_income:,.0f}")
-                st.write(f"**Avg Customer Age**: {self.merged_data['Age'].mean():.1f} years")
+                if 'Age' in self.merged_data.columns:
+                    st.write(f"**Avg Customer Age**: {self.merged_data['Age'].mean():.1f} years")
             else:
                 st.write("**Transaction Types**:")
                 if 'Transaction_Type' in self.transactions_df.columns:
@@ -302,58 +353,57 @@ class EnhancedTransactionDashboard:
             st.pyplot(fig)
             st.markdown('</div>', unsafe_allow_html=True)
         
-            # Monthly Trends - FIXED VERSION
-            col1, col2 = st.columns(2)
-            st.markdown('<div class="plot-container">', unsafe_allow_html=True)
-            st.subheader("Monthly Transaction Trends")
+        # Monthly Trends
+        st.markdown('<div class="plot-container">', unsafe_allow_html=True)
+        st.subheader("Monthly Transaction Trends")
 
-            # Fixed aggregation - using proper column names
-            monthly_trends = self.transactions_df.groupby('Year_Month').agg(
-                Transaction_Count=('Transaction_ID', 'count'),
-                Total_Amount=('Transaction_Amount', 'sum'),
-                Avg_Amount=('Transaction_Amount', 'mean')
-            ).reset_index()
+        # Fixed aggregation - using proper column names
+        monthly_trends = self.transactions_df.groupby('Year_Month').agg(
+            Transaction_Count=('Transaction_ID', 'count') if 'Transaction_ID' in self.transactions_df.columns else ('Transaction_Hour', 'count'),
+            Total_Amount=('Transaction_Amount', 'sum') if 'Transaction_Amount' in self.transactions_df.columns else (self.transactions_df.columns[1], 'sum')
+        ).reset_index()
 
-            monthly_trends['Year_Month'] = monthly_trends['Year_Month'].astype(str)
+        monthly_trends['Year_Month'] = monthly_trends['Year_Month'].astype(str)
 
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10))
+        fig, ax1 = plt.subplots(figsize=(14, 6))
 
-            # Extract unique years for cleaner x-axis labels
-            unique_years = sorted(self.transactions_df['Transaction_Year'].unique())
+        # Extract unique years for cleaner x-axis labels
+        unique_years = sorted(self.transactions_df['Transaction_Year'].unique())
 
-            # Create positions and labels for years only
-            year_positions = []
-            year_labels = []
+        # Create positions and labels for years only
+        year_positions = []
+        year_labels = []
 
-            for year in unique_years:
-                # Find the first occurrence of each year in the monthly data
-                year_str = str(year)
-                matching_indices = monthly_trends.index[monthly_trends['Year_Month'].str.startswith(year_str)].tolist()
-                if matching_indices:
-                    year_positions.append(matching_indices[0])  # First month of each year
-                    year_labels.append(year_str)
+        for year in unique_years:
+            # Find the first occurrence of each year in the monthly data
+            year_str = str(year)
+            matching_indices = monthly_trends.index[monthly_trends['Year_Month'].str.startswith(year_str)].tolist()
+            if matching_indices:
+                year_positions.append(matching_indices[0])  # First month of each year
+                year_labels.append(year_str)
 
-            # Transaction Count - use numeric indexing for plotting but show only year labels
-            x_values = range(len(monthly_trends))
-            ax1.plot(x_values, monthly_trends['Transaction_Count'], 
-                    color='blue', marker='o', linewidth=2, markersize=4)
-            ax1.set_ylabel('Transaction Count', color='blue')
-            ax1.tick_params(axis='y', labelcolor='blue')
-            ax1.set_title('Monthly Transaction Volume Trend', fontweight='bold')
-            ax1.grid(True, alpha=0.3)
+        # Transaction Count - use numeric indexing for plotting but show only year labels
+        x_values = range(len(monthly_trends))
+        ax1.plot(x_values, monthly_trends['Transaction_Count'], 
+                color='blue', marker='o', linewidth=2, markersize=4)
+        ax1.set_ylabel('Transaction Count', color='blue')
+        ax1.tick_params(axis='y', labelcolor='blue')
+        ax1.set_title('Monthly Transaction Volume Trend', fontweight='bold')
+        ax1.grid(True, alpha=0.3)
 
-            # Set x-axis to show only year labels at the first month of each year
-            ax1.set_xticks(year_positions)
-            ax1.set_xticklabels(year_labels, rotation=0)  # No rotation for years
+        # Set x-axis to show only year labels at the first month of each year
+        ax1.set_xticks(year_positions)
+        ax1.set_xticklabels(year_labels, rotation=0)  # No rotation for years
 
-            # Total Amount (secondary axis)
-            ax3 = ax1.twinx()
-            ax3.plot(x_values, monthly_trends['Total_Amount'], 
-                    color='red', marker='s', linewidth=2, markersize=4, linestyle='--')
-            ax3.set_ylabel('Total Amount (GHC)', color='red')
-            ax3.tick_params(axis='y', labelcolor='red')
-        
-    
+        # Total Amount (secondary axis)
+        ax2 = ax1.twinx()
+        ax2.plot(x_values, monthly_trends['Total_Amount'], 
+                color='red', marker='s', linewidth=2, markersize=4, linestyle='--')
+        ax2.set_ylabel('Total Amount (GHC)', color='red')
+        ax2.tick_params(axis='y', labelcolor='red')
+
+        st.pyplot(fig)
+        st.markdown('</div>', unsafe_allow_html=True)
         
         # Amount Distribution Analysis
         st.markdown('<div class="subsection-header">💰 Amount Distribution Analysis</div>', unsafe_allow_html=True)
@@ -364,53 +414,67 @@ class EnhancedTransactionDashboard:
             st.markdown('<div class="plot-container">', unsafe_allow_html=True)
             st.subheader("Transaction Amount Distribution")
             
+            # Find amount column
+            amount_col = 'Transaction_Amount'
+            if amount_col not in self.transactions_df.columns:
+                amt_cols = [col for col in self.transactions_df.columns if 'amount' in col.lower() or 'amt' in col.lower()]
+                if amt_cols:
+                    amount_col = amt_cols[0]
+            
             # Filter positive amounts for better visualization
-            transaction_amounts = self.transactions_df[self.transactions_df['Transaction_Amount'] > 0]['Transaction_Amount']
-            amount_95 = transaction_amounts[transaction_amounts <= transaction_amounts.quantile(0.95)]
-            
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
-            
-            # Histogram
-            ax1.hist(amount_95, bins=50, alpha=0.7, color='skyblue', edgecolor='black')
-            ax1.set_xlabel('Transaction Amount (GHC)')
-            ax1.set_ylabel('Frequency')
-            ax1.set_title('Distribution of Transaction Amounts (95th Percentile)', fontweight='bold')
-            ax1.grid(True, alpha=0.3)
-            
-            # Boxplot
-            ax2.boxplot(transaction_amounts, vert=False)
-            ax2.set_xlabel('Transaction Amount (GHC)')
-            ax2.set_title('Boxplot of Transaction Amounts', fontweight='bold')
-            ax2.set_xscale('log')
-            ax2.grid(True, alpha=0.3)
-            
-            plt.tight_layout()
-            st.pyplot(fig)
+            transaction_amounts = self.transactions_df[self.transactions_df[amount_col] > 0][amount_col]
+            if len(transaction_amounts) > 0:
+                amount_95 = transaction_amounts[transaction_amounts <= transaction_amounts.quantile(0.95)]
+                
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
+                
+                # Histogram
+                ax1.hist(amount_95, bins=50, alpha=0.7, color='skyblue', edgecolor='black')
+                ax1.set_xlabel('Transaction Amount (GHC)')
+                ax1.set_ylabel('Frequency')
+                ax1.set_title('Distribution of Transaction Amounts (95th Percentile)', fontweight='bold')
+                ax1.grid(True, alpha=0.3)
+                
+                # Boxplot
+                ax2.boxplot(transaction_amounts, vert=False)
+                ax2.set_xlabel('Transaction Amount (GHC)')
+                ax2.set_title('Boxplot of Transaction Amounts', fontweight='bold')
+                ax2.grid(True, alpha=0.3)
+                
+                plt.tight_layout()
+                st.pyplot(fig)
+            else:
+                st.info("No transaction amount data available for visualization")
             st.markdown('</div>', unsafe_allow_html=True)
             
         with col2:
             st.markdown('<div class="plot-container">', unsafe_allow_html=True)
             st.subheader("Debit vs Credit Analysis")
             
-            debit_count = (self.transactions_df['Debit_Amount'] > 0).sum()
-            credit_count = (self.transactions_df['Credit_Amount'] > 0).sum()
+            debit_count = (self.transactions_df['Debit_Amount'] > 0).sum() if 'Debit_Amount' in self.transactions_df.columns else 0
+            credit_count = (self.transactions_df['Credit_Amount'] > 0).sum() if 'Credit_Amount' in self.transactions_df.columns else 0
             total = len(self.transactions_df)
             
             # Create subplots
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
             
             # Pie chart
-            ax1.pie([debit_count, credit_count], labels=['Debit', 'Credit'], 
-                   autopct='%1.1f%%', startangle=90, colors=['#ff6b6b', '#4ecdc4'],
-                   textprops={'fontsize': 12})
-            ax1.set_title('Debit vs Credit Transactions', fontweight='bold')
+            if debit_count > 0 or credit_count > 0:
+                ax1.pie([debit_count, credit_count], labels=['Debit', 'Credit'], 
+                       autopct='%1.1f%%', startangle=90, colors=['#ff6b6b', '#4ecdc4'],
+                       textprops={'fontsize': 12})
+                ax1.set_title('Debit vs Credit Transactions', fontweight='bold')
+            else:
+                ax1.text(0.5, 0.5, 'No debit/credit data\navailable', 
+                        ha='center', va='center', transform=ax1.transAxes, fontsize=12)
+                ax1.set_title('Debit vs Credit Transactions', fontweight='bold')
             
             # Ratio by Account Type
             if 'Account_Type' in self.transactions_df.columns:
                 ratio_by_type = self.transactions_df.groupby('Account_Type').apply(
                     lambda x: pd.Series({
-                        'Debit_Ratio': len(x[x['Debit_Amount'] > 0]) / len(x),
-                        'Credit_Ratio': len(x[x['Credit_Amount'] > 0]) / len(x)
+                        'Debit_Ratio': len(x[x['Debit_Amount'] > 0]) / len(x) if 'Debit_Amount' in x.columns else 0,
+                        'Credit_Ratio': len(x[x['Credit_Amount'] > 0]) / len(x) if 'Credit_Amount' in x.columns else 0
                     })
                 ).reset_index()
                 
@@ -441,9 +505,9 @@ class EnhancedTransactionDashboard:
             with col1:
                 st.metric("Total Transactions", f"{total:,}")
             with col2:
-                st.metric("Debit Transactions", f"{debit_count:,} ({debit_count/total*100:.1f}%)")
+                st.metric("Debit Transactions", f"{debit_count:,} ({debit_count/total*100:.1f}%)" if total > 0 else "0")
             with col3:
-                st.metric("Credit Transactions", f"{credit_count:,} ({credit_count/total*100:.1f}%)")
+                st.metric("Credit Transactions", f"{credit_count:,} ({credit_count/total*100:.1f}%)" if total > 0 else "0")
                 
             st.markdown('</div>', unsafe_allow_html=True)
         
@@ -661,7 +725,15 @@ class EnhancedTransactionDashboard:
             with col1:
                 st.markdown('<div class="plot-container">', unsafe_allow_html=True)
                 st.subheader("Transactions per Customer")
-                transactions_per_customer = self.transactions_df.groupby('Customer_ID')['Transaction_ID'].count()
+                
+                # Find customer ID column
+                customer_id_col = 'Customer_ID'
+                if customer_id_col not in self.transactions_df.columns:
+                    cust_cols = [col for col in self.transactions_df.columns if 'customer' in col.lower() or 'cust' in col.lower()]
+                    if cust_cols:
+                        customer_id_col = cust_cols[0]
+                
+                transactions_per_customer = self.transactions_df.groupby(customer_id_col)['Transaction_Hour'].count()
                 
                 fig, ax = plt.subplots(figsize=(10, 6))
                 ax.hist(transactions_per_customer, bins=50, alpha=0.7, color='lightblue', edgecolor='black', log=True)
@@ -675,7 +747,15 @@ class EnhancedTransactionDashboard:
             with col2:
                 st.markdown('<div class="plot-container">', unsafe_allow_html=True)
                 st.subheader("Customer Spending Patterns")
-                customer_spending = self.transactions_df.groupby('Customer_ID')['Transaction_Amount'].sum()
+                
+                # Find amount column
+                amount_col = 'Transaction_Amount'
+                if amount_col not in self.transactions_df.columns:
+                    amt_cols = [col for col in self.transactions_df.columns if 'amount' in col.lower() or 'amt' in col.lower()]
+                    if amt_cols:
+                        amount_col = amt_cols[0]
+                
+                customer_spending = self.transactions_df.groupby(customer_id_col)[amount_col].sum()
                 
                 fig, ax = plt.subplots(figsize=(10, 6))
                 ax.hist(customer_spending, bins=50, alpha=0.7, color='lightgreen', edgecolor='black')
@@ -746,60 +826,73 @@ class EnhancedTransactionDashboard:
                 st.pyplot(fig)
                 st.markdown('</div>', unsafe_allow_html=True)
 
+def load_data_from_drive(file_id, filename):
+    """Load data from Google Drive with fallback options"""
+    try:
+        # Method 1: Direct download from Google Drive
+        url = f"https://drive.google.com/uc?id={file_id}"
+        df = pd.read_csv(url)
+        st.success(f"✅ Successfully loaded {filename} from Google Drive")
+        return df
+    except Exception as e:
+        st.warning(f"Could not load {filename} from Google Drive: {e}")
+        
+        # Method 2: Try alternative URL format
+        try:
+            url = f"https://docs.google.com/spreadsheets/d/{file_id}/export?format=csv"
+            df = pd.read_csv(url)
+            st.success(f"✅ Successfully loaded {filename} from Google Sheets")
+            return df
+        except Exception as e2:
+            st.warning(f"Could not load {filename} from Google Sheets: {e2}")
+            
+            # Method 3: Use file uploader as fallback
+            st.info(f"Please upload your {filename} file:")
+            uploaded_file = st.file_uploader(f"Upload {filename}", type=['csv'], key=filename)
+            if uploaded_file is not None:
+                df = pd.read_csv(uploaded_file)
+                st.success(f"✅ Successfully loaded {filename} from uploaded file")
+                return df
+            else:
+                st.error(f"❌ Could not load {filename}. Using empty DataFrame.")
+                return pd.DataFrame()
+
 def main():
     # Main dashboard
     st.markdown('<div class="main-header">🏦 Bank Transaction Analytics Dashboard</div>', unsafe_allow_html=True)
     
-    # Load data
-    try:
-        transactions_df = pd.read_csv("https://drive.google.com/uc?id=1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc")
-        customer_df = pd.read_csv("https://drive.google.com/uc?id=1yudFOERd3cvnw1xMh5utMXW6kBn04l3c")
-        
-        # Data preprocessing
-        transactions_df['Transaction_Date'] = pd.to_datetime(transactions_df['Transaction_Date'])
-        if 'Customer Since' in customer_df.columns:
-            customer_df['Customer Since'] = pd.to_datetime(customer_df['Customer Since'])
-        if 'Date of Birth' in customer_df.columns:
-            customer_df['Date of Birth'] = pd.to_datetime(customer_df['Date of Birth'])
-            
-    except Exception as e:
-        st.error(f"Error loading data files: {e}")
-        st.info("Using sample data for demonstration...")
-        
-        # Create comprehensive sample data
-        np.random.seed(42)
-        n_transactions = 50000
-        n_customers = 5000
-        
-        # Sample transactions data
-        transactions_df = pd.DataFrame({
-            'Transaction_ID': [f'TXN{i:06d}' for i in range(n_transactions)],
-            'Customer_ID': [f'CUST{i:05d}' for i in np.random.randint(0, n_customers, n_transactions)],
-            'Transaction_Date': pd.date_range('2022-01-01', periods=n_transactions, freq='H'),
-            'Transaction_Amount': np.random.exponential(500, n_transactions),
-            'Debit_Amount': np.random.exponential(300, n_transactions),
-            'Credit_Amount': np.random.exponential(400, n_transactions),
-            'Channel': np.random.choice(['Mobile', 'Internet Banking', 'Branch', 'ATM', 'POS'], n_transactions, p=[0.4, 0.3, 0.15, 0.1, 0.05]),
-            'Payment_Method': np.random.choice(['Transfer', 'Cash', 'Card', 'Cheque'], n_transactions, p=[0.5, 0.3, 0.15, 0.05]),
-            'Location': np.random.choice(['Accra', 'Kumasi', 'Takoradi', 'Tamale', 'Cape Coast', 'Tema', 'Madina', 'Obuasi'], n_transactions),
-            'Transaction_Type': np.random.choice(['Deposit', 'Withdrawal', 'Transfer', 'Payment', 'Bill'], n_transactions),
-            'Fraud_Flag': np.random.choice([True, False], n_transactions, p=[0.01, 0.99]),
-            'Balance_Mismatch': np.random.choice([True, False], n_transactions, p=[0.02, 0.98]),
-            'Account_Number': [f'ACC{i:08d}' for i in np.random.randint(10000000, 99999999, n_transactions)]
-        })
-        
-        # Sample customer data
-        customer_df = pd.DataFrame({
-            'Customer ID': [f'CUST{i:05d}' for i in range(n_customers)],
-            'Age': np.random.randint(18, 70, n_customers),
-            'Monthly Income (GHS)': np.random.exponential(3000, n_customers),
-            'Region': np.random.choice(['Greater Accra', 'Ashanti', 'Western', 'Northern', 'Eastern', 'Central'], n_customers),
-            'Town/District': np.random.choice(['Accra', 'Kumasi', 'Takoradi', 'Tamale', 'Cape Coast', 'Tema', 'Madina', 'Obuasi', 'Sunyani'], n_customers),
-            'Education Level': np.random.choice(['Primary', 'Secondary', 'Tertiary', 'Postgraduate'], n_customers, p=[0.1, 0.4, 0.4, 0.1]),
-            'Employment Sector': np.random.choice(['Private', 'Public', 'Self-Employed', 'Unemployed', 'Student'], n_customers, p=[0.4, 0.3, 0.15, 0.1, 0.05]),
-            'Customer Since': pd.to_datetime(np.random.choice(pd.date_range('2018-01-01', '2023-12-31', n_customers))),
-            'Date of Birth': pd.to_datetime(np.random.choice(pd.date_range('1950-01-01', '2004-12-31', n_customers)))
-        })
+    # Load data with multiple fallback methods
+    st.info("📊 Loading data...")
+    
+    # Google Drive file IDs (replace with your actual file IDs)
+    TRANSACTIONS_FILE_ID = "https://drive.google.com/file/d/1qfvEooRGvqJQyGxRWT7QjhnSRf9gT2Oc/view?usp=drive_link"
+    CUSTOMERS_FILE_ID = "https://drive.google.com/file/d/1yudFOERd3cvnw1xMh5utMXW6kBn04l3c/view?usp=drive_link"
+    
+    transactions_df = load_data_from_drive(TRANSACTIONS_FILE_ID, "transactions data")
+    customer_df = load_data_from_drive(CUSTOMERS_FILE_ID, "customer data")
+    
+    # Check if data was loaded successfully
+    if transactions_df.empty:
+        st.error("❌ No transaction data available. Please check your data sources.")
+        return
+    
+    # Display data info
+    st.success(f"✅ Loaded {len(transactions_df):,} transactions and {len(customer_df):,} customer records")
+    
+    # Show column information
+    with st.expander("🔍 Data Overview"):
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Transactions Data Columns:**")
+            st.write(list(transactions_df.columns))
+            st.write(f"**Shape:** {transactions_df.shape}")
+        with col2:
+            if not customer_df.empty:
+                st.write("**Customer Data Columns:**")
+                st.write(list(customer_df.columns))
+                st.write(f"**Shape:** {customer_df.shape}")
+            else:
+                st.write("No customer data available")
     
     # Initialize dashboard
     dashboard = EnhancedTransactionDashboard(transactions_df, customer_df)
