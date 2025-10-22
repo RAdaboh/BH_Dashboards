@@ -11,16 +11,22 @@ st.title("Loan Product Profitability Dashboard")
 # --- DATA LOADING AND CACHING ---
 
 @st.cache_data
-def load_data(parquet_path="https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=drive_link", csv_path="/https://drive.google.com/file/d/1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM/view?usp=drive_link"):
-    if os.path.exists(parquet_path):
-        return pd.read_parquet("https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=drive_link")
-    elif os.path.exists("https://drive.google.com/file/d/1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM/view?usp=drive_link"):
-        df = pd.read_csv(csv_path)
-        df.to_parquet(parquet_path, index=False)
+def load_data():
+    try:
+        # Try loading from Parquet if available (faster)
+        parquet_url = "https://drive.google.com/uc?id=1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr"
+        df = pd.read_parquet(parquet_url)
         return df
-    else:
-        st.error("❌ Neither Parquet nor CSV file found. Please ensure 'loan_performance.csv' is in the folder.")
-        return pd.DataFrame()
+    except Exception:
+        # Fallback to CSV if Parquet fails
+        csv_url = "https://drive.google.com/uc?id=1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM"
+        try:
+            df = pd.read_csv(csv_url)
+            df.to_parquet("loan_data.parquet", index=False)
+            return df
+        except Exception as e:
+            st.error(f"❌ Failed to load dataset: {e}")
+            return pd.DataFrame()
 
 @st.cache_data
 def preprocess_data(df):
