@@ -27,7 +27,7 @@ def load_data():
         return None
 
 # Load data with error handling
-repay = load_data()
+repay = load_data("https://drive.google.com/file/d/15ardOjcLjcrmhBH0SZu7NyflILSwEgiQ/view?usp=drive_link")
 if repay is None:
     st.error("❌ Failed to load data. Please check your data source.")
     st.stop()
