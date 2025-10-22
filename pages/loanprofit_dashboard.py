@@ -13,8 +13,8 @@ st.title("Loan Product Profitability Dashboard")
 @st.cache_data
 def load_data(parquet_path="https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=drive_link", csv_path="/https://drive.google.com/file/d/1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM/view?usp=drive_link"):
     if os.path.exists(parquet_path):
-        return pd.read_parquet(parquet_path)
-    elif os.path.exists(csv_path):
+        return pd.read_parquet("https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=drive_link")
+    elif os.path.exists("https://drive.google.com/file/d/1-XTNFwFpEID7avG8uHToGVqxA0Vg9rfM/view?usp=drive_link"):
         df = pd.read_csv(csv_path)
         df.to_parquet(parquet_path, index=False)
         return df
