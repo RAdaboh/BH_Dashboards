@@ -14,7 +14,7 @@ st.title("Loan Product Profitability Dashboard")
 def load_data():
     try:
         # Try loading from Parquet if available (faster)
-        parquet_url = "https://drive.google.com/uc?id=1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr&export=download"
+        parquet_url = "https://drive.google.com/file/d/1nRU2R4u_ohjhjqjz6xtuwAl3HBbdmrRr/view?usp=sharing"
         st.info("🔄 Loading data from Parquet...")
         df = pd.read_parquet(parquet_url)
         st.success(f"✅ Successfully loaded data from Parquet! Shape: {df.shape}")
