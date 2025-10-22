@@ -10,5 +10,3 @@ xgboost
 folium
 streamlit-folium
 prophet
-datetime
-io
